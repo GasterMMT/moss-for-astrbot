@@ -1,0 +1,10 @@
+# 统一换行符
+* text=auto
+*.py text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.txt text eol=lf
