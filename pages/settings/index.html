@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOSS 语音控制台</title>
+<style>
+  :root {
+    --bg: #f4f5f9; --card: #ffffff; --text: #1c1f26; --sub: #6b7280;
+    --border: #e8eaf0; --border-strong: #d8dbe6;
+    --accent: #5b5ff5; --accent-hover: #4649d6; --accent-soft: #eef0ff;
+    --ok: #15803d; --ok-bg: #f0fdf4; --warn: #b45309; --warn-bg: #fffbeb;
+    --err: #dc2626; --err-bg: #fef2f2;
+    --radius: 14px; --shadow: 0 1px 3px rgba(16,24,40,.06), 0 10px 30px rgba(16,24,40,.05);
+  }
+  [data-theme="dark"] {
+    --bg: #0f1117; --card: #181a21; --text: #e6e8ee; --sub: #9aa0ac;
+    --border: #262932; --border-strong: #343845;
+    --accent: #7c85ff; --accent-hover: #98a0ff; --accent-soft: #1d2033;
+    --ok: #4ade80; --ok-bg: #10261a; --warn: #fbbf24; --warn-bg: #291d0e;
+    --err: #f87171; --err-bg: #2b1515;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.3);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 920px; margin: 0 auto; padding: 26px 22px 60px; }
+
+  /* header */
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+  .brand { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6); color: #fff; font-size: 22px; font-weight: 800; box-shadow: var(--shadow); }
+  .header .titles h1 { font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+  .header .titles p { color: var(--sub); font-size: 12.5px; margin-top: 1px; }
+  .pills { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--card); border: 1px solid var(--border); color: var(--sub); }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .pill.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+  .pill.err { color: var(--err); background: var(--err-bg); border-color: transparent; }
+
+  /* cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; }
+  .card + .card { margin-top: 18px; }
+  .card h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+  .card .sub { color: var(--sub); font-size: 12.5px; margin-bottom: 16px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid .card { margin-top: 0; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+  /* status rows */
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--border); }
+  .row:last-child { border-bottom: none; }
+  .row .k { color: var(--sub); }
+  .row .v { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+
+  /* form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; margin: 14px 0 6px; color: var(--text); }
+  .field label .opt { color: var(--sub); font-weight: 400; }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* switches */
+  .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px dashed var(--border); }
+  .switch-row:last-child { border-bottom: none; }
+  .switch-row .lbl { font-weight: 600; font-size: 13.5px; }
+  .switch-row .hint { display: block; color: var(--sub); font-weight: 400; font-size: 12px; }
+  .switch { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--border-strong); border-radius: 999px; transition: .2s; cursor: pointer; }
+  .slider:before { content: ""; position: absolute; width: 19px; height: 19px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider:before { transform: translateX(19px); }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border-strong); background: var(--card); color: var(--text);
+    padding: 10px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+
+  audio { width: 100%; margin-top: 12px; }
+
+  /* toast */
+  #toast { position: fixed; right: 22px; bottom: 22px; max-width: 380px; padding: 14px 16px; border-radius: 12px;
+    background: var(--card); color: var(--text); box-shadow: 0 10px 40px rgba(0,0,0,.18); border: 1px solid var(--border);
+    font-size: 13px; white-space: pre-wrap; word-break: break-all; opacity: 0; transform: translateY(12px); transition: all .25s; z-index: 50; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok { border-left: 4px solid var(--ok); }
+  #toast.err { border-left: 4px solid var(--err); }
+  #toast.info { border-left: 4px solid var(--accent); }
+
+  .divider { height: 1px; background: var(--border); margin: 18px 0; }
+  .small-note { color: var(--sub); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="brand">M</div>
+    <div class="titles">
+      <h1>MOSS 语音控制台</h1>
+      <p>MOSI 官方 MossAPI · https://api.mosi.cn · 单人语音生成 / 音频转写</p>
+    </div>
+    <div class="pills">
+      <span class="pill" id="p-ping"><span class="dot"></span><span id="p-ping-t">检测中…</span></span>
+      <span class="pill" id="p-ver">v2.1.0</span>
+      <button class="btn" id="btn-refresh" style="padding:6px 12px;font-size:12px">刷新</button>
+    </div>
+  </div>
+
+  <!-- 状态 -->
+  <div class="card">
+    <h2>🛰️ 联动状态</h2>
+    <div class="sub">MOSS 服务提供商条目、AstrBot 当前语音引擎是否已切换为 MOSS。</div>
+    <div class="rows">
+      <div class="row"><span class="k">API Key</span><span class="v" id="st-key">–</span></div>
+      <div class="row"><span class="k">TTS 条目</span><span class="v" id="st-tts-entry">–</span></div>
+      <div class="row"><span class="k">STT 条目</span><span class="v" id="st-stt-entry">–</span></div>
+      <div class="row"><span class="k">AstrBot 语音合成</span><span class="v" id="st-tts-using">–</span></div>
+      <div class="row"><span class="k">AstrBot 语音识别</span><span class="v" id="st-stt-using">–</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-save">💾 保存并同步</button>
+      <button class="btn" id="btn-sync">🔗 同步到服务提供商</button>
+      <button class="btn" id="btn-test-tts">🎧 测试 TTS</button>
+      <button class="btn" id="btn-test-stt">🎤 测试 STT</button>
+    </div>
+    <audio id="player" controls style="display:none"></audio>
+  </div>
+
+  <!-- 语音合成 -->
+  <div class="grid">
+    <div class="card">
+      <h2>🎙️ 语音合成</h2>
+      <div class="sub">POST /v1/audio/speech · 音色通过 voice_id 指定。</div>
+      <div class="form-grid">
+        <div class="field"><label>API Key <span class="opt">（MossAPI 控制台「API 密钥」）</span></label><input type="password" id="c-api_key" placeholder="sk-..." autocomplete="off"></div>
+        <div class="field"><label>API 地址</label><input type="text" id="c-api_base" placeholder="https://api.mosi.cn"></div>
+        <div class="field"><label>模型</label><select id="c-model"><option value="moss-tts">moss-tts（单人语音生成）</option></select></div>
+        <div class="field"><label>模型版本 <span class="opt">（留空=默认 1.0 Pro）</span></label><input type="text" id="c-version" placeholder="flash-20260626 / 留空"></div>
+        <div class="field"><label>音色 ID <span class="opt">（必填）</span></label><input type="text" id="c-voice_id" placeholder="voice_id"></div>
+        <div class="field"><label>输出格式</label><select id="c-response_format"><option value="mp3">mp3（推荐）</option><option value="wav">wav</option></select></div>
+        <div class="field"><label>交付方式</label><select id="c-delivery_method"><option value="audio">audio（音频）</option><option value="url">url（结果链接）</option></select></div>
+        <div class="field"><label>超时（秒）</label><input type="number" id="c-timeout" placeholder="120"></div>
+      </div>
+      <div class="divider"></div>
+      <h2 style="margin-bottom:8px">🎨 克隆音色</h2>
+      <div class="sub">官方 POST /v1/audio/voices · 参考音频支持 multipart audio_sample。</div>
+      <div class="form-grid">
+        <div class="field"><label>参考音频本地路径 <span class="opt">（AstrBot 所在机器可读）</span></label><input type="text" id="clone-path" placeholder="C:\voice\my_sample.wav"></div>
+        <div class="field"><label>音色名称 <span class="opt">（选填）</span></label><input type="text" id="clone-name" placeholder="我的声音"></div>
+        <div class="field"><label>HTTP 代理 <span class="opt">（选填）</span></label><input type="text" id="c-proxy" placeholder="http://127.0.0.1:7890"></div>
+      </div>
+      <div class="btn-row"><button class="btn" id="btn-clone">✨ 克隆音色</button></div>
+    </div>
+
+    <!-- 语音识别 + 同步 -->
+    <div class="card">
+      <h2>🗣️ 语音识别</h2>
+      <div class="sub">POST /v1/audio/transcriptions · 多说话人转写。</div>
+      <div class="form-grid">
+        <div class="field"><label>转写模型</label><select id="s-model">
+          <option value="moss-transcribe">moss-transcribe（普通）</option>
+          <option value="moss-transcribe-diarize">moss-transcribe-diarize（多说话人）</option>
+        </select></div>
+        <div class="field"><label>模型版本</label><input type="text" id="s-version" placeholder="留空用默认"></div>
+        <div class="field"><label>响应格式</label><select id="s-response_format"><option value="json">json</option><option value="text">text</option></select></div>
+      </div>
+      <div class="switch-row" style="margin-top:10px">
+        <span class="lbl">说话人分离<span class="hint">多说话人转写建议开启，返回结构化 segments</span></span>
+        <label class="switch"><input type="checkbox" id="s-diarize" checked><span class="slider"></span></label>
+      </div>
+      <div class="switch-row">
+        <span class="lbl">结果带说话人标注<span class="hint">显示「S01: ...」</span></span>
+        <label class="switch"><input type="checkbox" id="s-include_speaker" checked><span class="slider"></span></label>
+      </div>
+      <div class="switch-row">
+        <span class="lbl">结果带时间戳<span class="hint">每段前加 [ss.s-ss.s]</span></span>
+        <label class="switch"><input type="checkbox" id="s-include_timestamp"><span class="slider"></span></label>
+      </div>
+
+      <div class="divider"></div>
+      <h2 style="margin-bottom:8px">🔁 自动同步</h2>
+      <div class="switch-row">
+        <span class="lbl">启动时自动同步<span class="hint">启动/重载时创建或更新 MOSS 服务提供商</span></span>
+        <label class="switch"><input type="checkbox" id="y-auto_sync" checked><span class="slider"></span></label>
+      </div>
+      <div class="switch-row">
+        <span class="lbl">同步后自动启用<span class="hint">把 AstrBot 默认语音引擎切到 MOSS</span></span>
+        <label class="switch"><input type="checkbox" id="y-auto_enable" checked><span class="slider"></span></label>
+      </div>
+      <div class="small-note">同步后会更新默认配置与所有「配置组」，MOSS 会出现在 WebUI「服务提供商」页的 TTS / STT 分组里。</div>
+    </div>
+  </div>
+
+  <div class="foot" style="text-align:center;color:var(--sub);font-size:12px;margin-top:26px">MOSS 语音插件 · 由 MOSI 官方 API 驱动 · 配置保存在本机 AstrBot</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  // AstrBot 在页面末尾注入桥接脚本（window.AstrBotPluginPage），本页脚本先于桥接执行，
+  // 因此必须惰性获取，不能提前缓存变量；注释与字符串中严禁出现 body 结束标签字面量。
+  function getBridge() { return window.AstrBotPluginPage || null; }
+  function waitForBridge(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 6000);
+    return new Promise(function (resolve) {
+      (function tick() {
+        if (window.AstrBotPluginPage) { resolve(window.AstrBotPluginPage); return; }
+        if (Date.now() > deadline) { resolve(null); return; }
+        setTimeout(tick, 100);
+      })();
+    });
+  }
+  function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise(function (_, reject) { setTimeout(function () { reject(new Error("等待超时")); }, ms); })]);
+  }
+
+  var toastTimer;
+  function toast(text, kind) {
+    var el = $("toast");
+    el.textContent = text;
+    el.className = "show " + (kind || "info");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = ""; }, 6000);
+  }
+  function pill(el, text, kind) { el.innerHTML = text; el.className = "pill " + (kind || ""); }
+  function setLoading(btn, on) {
+    if (!btn) return;
+    btn.disabled = on;
+    btn.innerHTML = on ? '<span class="spin"></span> 处理中…' : btn.getAttribute("data-label");
+  }
+
+  async function apiGet(path) { var b = getBridge(); if (!b) throw new Error("插件页面桥接未加载，请刷新页面或重启 AstrBot"); return await b.apiGet("page/" + path, {}); }
+  async function apiPost(path, body) { var b = getBridge(); if (!b) throw new Error("插件页面桥接未加载，请刷新页面或重启 AstrBot"); return await b.apiPost("page/" + path, body || {}); }
+
+  async function loadPing() {
+    try {
+      var p = await apiGet("ping");
+      if (p && p.ok) pill($("p-ping"), '<span class="dot"></span>后端 v' + p.version + " 正常", "ok");
+      else pill($("p-ping"), '<span class="dot"></span>异常', "err");
+    } catch (e) {
+      pill($("p-ping"), '<span class="dot"></span>不可达', "err");
+      toast("页面 API 自检失败: " + (e && e.message ? e.message : e) + "\n请确认已重启 AstrBot 后刷新本页。", "err");
+    }
+  }
+
+  async function loadStatus() {
+    try {
+      var st = await apiGet("status");
+      $("st-key").innerHTML = st.api_key_configured ? '<span class="pill ok">' + st.api_key_masked + '</span>' : '<span class="pill warn">未配置</span>';
+      $("st-tts-entry").innerHTML = st.providers.tts_entry_exists ? '<span class="pill ok">已创建' + (st.providers.tts_loaded ? " · 已加载" : "") + '</span>' : '<span class="pill err">未创建</span>';
+      $("st-stt-entry").innerHTML = st.providers.stt_entry_exists ? '<span class="pill ok">已创建' + (st.providers.stt_loaded ? " · 已加载" : "") + '</span>' : '<span class="pill err">未创建</span>';
+      $("st-tts-using").innerHTML = st.astrbot_tts.using_moss ? '<span class="pill ok">MOSS 官方 TTS' + (st.astrbot_tts.enabled ? " · 已启用" : "") + '</span>' : '<span class="pill warn">未使用 MOSS（' + (st.astrbot_tts.provider_id || "无") + '）</span>';
+      $("st-stt-using").innerHTML = st.astrbot_stt.using_moss ? '<span class="pill ok">MOSS 官方 STT' + (st.astrbot_stt.enabled ? " · 已启用" : "") + '</span>' : '<span class="pill warn">未使用 MOSS（' + (st.astrbot_stt.provider_id || "无") + '）</span>';
+      $("p-ver").textContent = "v" + (st.plugin_version || "2.1.0");
+    } catch (e) { toast("获取状态失败: " + (e && e.message ? e.message : e), "err"); }
+  }
+
+  function collect() {
+    return {
+      cloud: {
+        api_key: $("c-api_key").value.trim(),
+        api_base: $("c-api_base").value.trim() || "https://api.mosi.cn",
+        model: $("c-model").value,
+        version: $("c-version").value.trim(),
+        voice_id: $("c-voice_id").value.trim(),
+        response_format: $("c-response_format").value,
+        delivery_method: $("c-delivery_method").value,
+        timeout: parseInt($("c-timeout").value, 10) || 120,
+        proxy: $("c-proxy").value.trim(),
+      },
+      stt: {
+        model: $("s-model").value,
+        version: $("s-version").value.trim(),
+        diarize: $("s-diarize").checked,
+        response_format: $("s-response_format").value,
+        include_speaker: $("s-include_speaker").checked,
+        include_timestamp: $("s-include_timestamp").checked,
+      },
+      sync: { auto_sync: $("y-auto_sync").checked, auto_enable: $("y-auto_enable").checked },
+    };
+  }
+
+  function applyConfig(cfg) {
+    var c = cfg.cloud || {}, s = cfg.stt || {}, y = cfg.sync || {};
+    $("c-api_key").value = c.api_key || "";
+    $("c-api_base").value = c.api_base || "https://api.mosi.cn";
+    $("c-model").value = c.model || "moss-tts";
+    $("c-version").value = c.version || "";
+    $("c-voice_id").value = c.voice_id || "";
+    $("c-response_format").value = c.response_format || "mp3";
+    $("c-delivery_method").value = c.delivery_method || "audio";
+    $("c-timeout").value = c.timeout || 120;
+    $("c-proxy").value = c.proxy || "";
+    $("s-model").value = s.model || "moss-transcribe-diarize";
+    $("s-version").value = s.version || "";
+    $("s-response_format").value = s.response_format || "json";
+    $("s-diarize").checked = s.diarize !== false;
+    $("s-include_speaker").checked = s.include_speaker !== false;
+    $("s-include_timestamp").checked = s.include_timestamp === true;
+    $("y-auto_sync").checked = y.auto_sync !== false;
+    $("y-auto_enable").checked = y.auto_enable !== false;
+  }
+
+  async function loadConfig() { try { var cfg = await apiGet("config"); if (cfg && typeof cfg === "object") applyConfig(cfg); } catch (e) { toast("读取配置失败: " + (e && e.message ? e.message : e), "err"); } }
+
+  async function doSave() {
+    setLoading($("btn-save"), true);
+    try {
+      var res = await apiPost("config", collect());
+      if (res && res.ok) {
+        var synced = res.synced, extra = "";
+        if (synced && !synced.error) extra = "，已同步（MOSS 已进入服务提供商）";
+        else if (synced && synced.error) extra = "；同步失败：" + synced.error;
+        toast("✅ 配置已保存" + extra, "ok");
+        await loadStatus();
+      } else toast("保存失败: " + ((res && res.error) || "未知错误"), "err");
+    } catch (e) { toast("保存失败: " + (e && e.message ? e.message : e), "err"); }
+    finally { setLoading($("btn-save"), false); }
+  }
+
+  async function doSync() {
+    setLoading($("btn-sync"), true);
+    try {
+      var res = await apiPost("sync", {});
+      if (res && res.ok) {
+        var lines = (res.results || []).map(function (r) { return "· " + r.provider_id + " → " + r.action + (r.error ? "（" + r.error + "）" : ""); });
+        toast("✅ 同步完成\n" + lines.join("\n") + (res.auto_enable ? "\n已切换默认语音引擎为 MOSS" : ""), "ok");
+        await loadStatus();
+      } else toast("同步失败: " + ((res && res.error) || "未知错误"), "err");
+    } catch (e) { toast("同步失败: " + (e && e.message ? e.message : e), "err"); }
+    finally { setLoading($("btn-sync"), false); }
+  }
+
+  async function doTestTTS() {
+    setLoading($("btn-test-tts"), true);
+    try {
+      var res = await apiPost("test-tts", {});
+      if (res && res.ok) {
+        toast("✅ TTS 测试成功，正在播放…", "ok");
+        var p = $("player"); p.src = "data:" + res.audio_mime + ";base64," + res.audio_base64; p.style.display = "block"; p.play().catch(function () {});
+      } else toast("TTS 测试失败: " + ((res && res.error) || "未知错误"), "err");
+    } catch (e) { toast("TTS 测试失败: " + (e && e.message ? e.message : e), "err"); }
+    finally { setLoading($("btn-test-tts"), false); }
+  }
+
+  async function doTestSTT() {
+    setLoading($("btn-test-stt"), true);
+    try {
+      var res = await apiPost("test-stt", {});
+      if (res && res.ok) toast("✅ STT 测试成功\n转写结果：\n「" + res.text + "」", "ok");
+      else toast("STT 测试失败: " + ((res && res.error) || "未知错误"), "err");
+    } catch (e) { toast("STT 测试失败: " + (e && e.message ? e.message : e), "err"); }
+    finally { setLoading($("btn-test-stt"), false); }
+  }
+
+  async function doClone() {
+    var path = $("clone-path").value.trim();
+    if (!path) { toast("请先填写参考音频的本地路径", "err"); return; }
+    setLoading($("btn-clone"), true);
+    try {
+      var res = await apiPost("clone", { audio_path: path, name: $("clone-name").value.trim() });
+      if (res && res.ok) {
+        $("c-voice_id").value = res.voice_id;
+        toast("✅ 克隆成功！voice_id 已填入配置：\n" + res.voice_id + (res.name ? "\n名称：" + res.name : "") + "\n记得点击「保存并同步」。", "ok");
+        await loadStatus();
+      } else toast("克隆失败: " + ((res && res.error) || "未知错误"), "err");
+    } catch (e) { toast("克隆失败: " + (e && e.message ? e.message : e), "err"); }
+    finally { setLoading($("btn-clone"), false); }
+  }
+
+  ["btn-save", "btn-sync", "btn-test-tts", "btn-test-stt", "btn-refresh", "btn-clone"].forEach(function (id) { $(id).setAttribute("data-label", $(id).innerHTML.replace(/<[^>]*>/g, "").trim()); });
+  $("btn-save").addEventListener("click", doSave);
+  $("btn-sync").addEventListener("click", doSync);
+  $("btn-test-tts").addEventListener("click", doTestTTS);
+  $("btn-test-stt").addEventListener("click", doTestSTT);
+  $("btn-clone").addEventListener("click", doClone);
+  $("btn-refresh").addEventListener("click", function () { loadStatus().then(loadConfig).then(loadPing); });
+
+  (async function init() {
+    var b = await waitForBridge(8000);
+    if (!b) { toast("AstrBot 插件页面桥接未加载：请在 WebUI 插件页中打开本页面；若已在插件页内请刷新或重启 AstrBot。", "err"); return; }
+    try { var ctx = await withTimeout(b.ready(), 5000); if (ctx && ctx.pluginVersion) $("p-ver").textContent = "v" + ctx.pluginVersion; }
+    catch (e) { toast("桥接上下文初始化失败: " + (e && e.message ? e.message : e), "err"); return; }
+    await loadConfig();
+    await loadStatus();
+    await loadPing();
+  })();
+})();
+</script>
+</body>
+</html>

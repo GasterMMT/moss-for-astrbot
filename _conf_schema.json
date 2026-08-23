@@ -1,0 +1,141 @@
+{
+  "cloud": {
+    "type": "object",
+    "description": "官方 API（MossAPI · https://api.mosi.cn）",
+    "hint": "API Key 在 MossAPI 控制台「API 密钥」页创建。保存后在插件 settings 页面点击「同步到服务提供商」即可生效。",
+    "items": {
+      "api_key": {
+        "type": "string",
+        "description": "API Key",
+        "hint": "MossAPI 控制台创建的密钥。留空则不同步/不测试。",
+        "default": ""
+      },
+      "api_base": {
+        "type": "string",
+        "description": "API 地址",
+        "hint": "官方地址为 https://api.mosi.cn，一般无需修改",
+        "default": "https://api.mosi.cn"
+      },
+      "model": {
+        "type": "string",
+        "description": "单人语音生成模型",
+        "hint": "官方取值为 moss-tts",
+        "options": [
+          "moss-tts"
+        ],
+        "default": "moss-tts"
+      },
+      "version": {
+        "type": "string",
+        "description": "模型版本",
+        "hint": "可指定已上线并对外开放的模型版本；留空使用服务端当前默认版本。",
+        "default": ""
+      },
+      "voice_id": {
+        "type": "string",
+        "description": "音色 ID（必填）",
+        "hint": "官方接口只接受音色 ID。可通过插件 settings 页面一键选择内置音色，或用参考音频克隆音色。默认：轻快灵动女声 806c9695-6160-404e-8722-4f788d935af3",
+        "default": "806c9695-6160-404e-8722-4f788d935af3"
+      },
+      "response_format": {
+        "type": "string",
+        "description": "输出格式",
+        "hint": "官方推荐 mp3",
+        "options": [
+          "mp3",
+          "wav"
+        ],
+        "default": "mp3"
+      },
+      "delivery_method": {
+        "type": "string",
+        "description": "交付方式",
+        "hint": "audio：直接返回音频二进制；url：返回 JSON 与结果 URL",
+        "options": [
+          "audio",
+          "url"
+        ],
+        "default": "audio"
+      },
+      "timeout": {
+        "type": "int",
+        "description": "请求超时（秒）",
+        "default": 120
+      },
+      "proxy": {
+        "type": "string",
+        "description": "HTTP 代理",
+        "hint": "如 http://127.0.0.1:7890，留空不使用",
+        "default": ""
+      }
+    }
+  },
+  "stt": {
+    "type": "object",
+    "description": "音频转写（/v1/audio/transcriptions）",
+    "hint": "普通转写用 moss-transcribe；多说话人转写用 moss-transcribe-diarize。插件会自动把平台语音转成 WAV 后以 multipart file 上传（需要系统安装 ffmpeg）。",
+    "items": {
+      "model": {
+        "type": "string",
+        "description": "转写模型",
+        "options": [
+          "moss-transcribe",
+          "moss-transcribe-diarize"
+        ],
+        "default": "moss-transcribe-diarize"
+      },
+      "version": {
+        "type": "string",
+        "description": "模型版本",
+        "hint": "留空使用服务端默认版本（多说话人转写可选 v20260410-streamparam-20260703）。",
+        "default": ""
+      },
+      "diarize": {
+        "type": "bool",
+        "description": "说话人分离",
+        "hint": "多说话人转写时建议开启，返回结构化 segments（说话人 + 起止时间）。",
+        "default": true
+      },
+      "response_format": {
+        "type": "string",
+        "description": "响应格式",
+        "options": [
+          "json",
+          "text"
+        ],
+        "default": "json"
+      },
+      "include_speaker": {
+        "type": "bool",
+        "description": "结果带说话人标注",
+        "hint": "开启后多人语音结果形如「S01: ...」（插件侧格式化）",
+        "default": true
+      },
+      "include_timestamp": {
+        "type": "bool",
+        "description": "结果带时间戳",
+        "hint": "开启后每段结果前加 [ss.s-ss.s]（插件侧格式化）",
+        "default": false
+      }
+    }
+  },
+  "sync": {
+    "type": "object",
+    "description": "同步与开关",
+    "hint": "控制插件与 AstrBot 服务提供商的联动。",
+    "items": {
+      "auto_sync": {
+        "type": "bool",
+        "description": "启动时自动同步",
+        "hint": "AstrBot 启动/插件重载时，自动按上面的配置创建或更新 MOSS 官方 TTS / STT 服务提供商（需要已填写 API Key）。",
+        "default": true
+      },
+      "auto_enable": {
+        "type": "bool",
+        "description": "同步后自动启用",
+        "hint": "同步后将 AstrBot 的默认「语音合成 / 语音识别」切换为 MOSS 官方服务并开启。",
+        "default": true
+      }
+    }
+  }
+}

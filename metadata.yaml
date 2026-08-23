@@ -1,0 +1,8 @@
+name: astrbot_plugin_moss_voice # 插件的唯一标识，必须为合法 Python 标识符，且不能和已有插件冲突
+desc: 为 AstrBot 接入 MOSI 官方 MossAPI（https://api.mosi.cn）：单人语音生成（/v1/audio/speech）与音频转写/多说话人转写（/v1/audio/transcriptions），支持音色列表、参考音频克隆音色，自带 WebUI 配置页面。
+short_desc: 接入 MOSI 官方 MOSS 语音 API（TTS / STT）
+author: MOSS for Astrbot # 插件作者
+version: 2.1.0 # 插件版本
+repo: https://github.com/GasterMMT/moss-for-astrbot # 插件仓库地址（请替换为你的仓库地址）
+astrbot_version: ">=4.16,<5"
+display_name: MOSS 语音（TTS/STT）
