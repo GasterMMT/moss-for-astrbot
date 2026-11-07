@@ -1,0 +1,14 @@
+{
+  "views": {
+    "settings": {
+      "title": "MOSS 设置",
+      "description": "AstrBot 的 MOSS TTS / STT 配置与调试"
+    }
+  },
+  "pages": {
+    "settings": {
+      "title": "MOSS 设置",
+      "description": "AstrBot 的 MOSS TTS / STT 配置与调试"
+    }
+  }
+}

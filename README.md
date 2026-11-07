@@ -1,150 +1,228 @@
-# MOSS 语音插件（TTS / STT）for AstrBot
+# MOSS 语音接入 for AstrBot
 
-为 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 接入 **MOSI 官方 MossAPI**（[https://api.mosi.cn](https://api.mosi.cn)），提供官方云端**单人语音生成**与**音频转写/多说话人转写**能力，自带现代化 WebUI 控制台页面。
+把 MOSS 官方 TTS / STT 接进 AstrBot。插件注册 `moss_tts` / `moss_stt` 两个服务提供商，并提供一个单页 WebUI 用来配置和做最小化调试。
 
-> 官方 API 文档：[https://platform.mosi.cn/docs](https://platform.mosi.cn/docs) — 本插件所有接口契约均以此为准。
+![MOSS 设置](docs/console.png)
 
-## ✨ 特性
+> 官方文档：[platform.mosi.cn/docs](https://platform.mosi.cn/docs)
+> API 域名：`https://api.mosi.cn`
 
-- ☁️ **官方云端**：无需 GPU / 自建服务，纯 HTTP 调用 `https://api.mosi.cn`
-- 🎧 **语音合成**：`POST /v1/audio/speech`，支持音色克隆、内置音色、`[pause X.Ys]` 停顿标记
-- 🎙️ **音频转写**：`POST /v1/audio/transcriptions`，普通转写 + 多说话人转写（说话人分离、时间戳）
-- 🎨 **克隆音色**：`POST /v1/audio/voices`，用本地参考音频一键克隆，自动填入 voice_id
-- 🖥️ **WebUI 控制台**：联动状态、配置、克隆、一键同步、TTS/STT 连通性测试，随 AstrBot 深/浅色主题
-- 🔁 **一键接入**：保存后自动创建 `moss_tts_cloud` / `moss_stt_cloud` 服务提供商，并切换 AstrBot 默认语音引擎
-- 🪪 **配置组适配**：默认配置 + 所有「配置组」都会同步为 MOSS，杜绝历史提供商（如 MiMo）残留
-- 🧩 **幂等热重载**：插件重载不冲突，AstrBot 启动/重载自动完成同步
+## 这个插件做什么
 
-## 🧭 工作原理
+- **TTS Provider**：AstrBot 需要发语音时，调用 `POST /v1/audio/speech`，返回本地 mp3/wav 文件。
+- **STT Provider**：AstrBot 收到语音时，调用 `POST /v1/audio/transcriptions`，返回转写文本。
+- **单页设置**：API 连接、TTS、STT、Provider 路由、测试，全部在一页里。
+- **账号音色**：从 `GET /v1/audio/voices` 读取当前账号音色；也可以直接粘贴 MOSS Create 里复制的 `voice_id`。
+- **最小调试**：一小段 TTS 测试和单文件 STT 测试，用来确认 Key / 音色 / 模型可用。
 
+不包含：音色克隆、音色库页面、批量转写、语音工作台。音色请在 [MOSS Create](https://create.moss.cn/voice/library) 克隆，然后把 `voice_id` 复制回来。
+
+## 环境
+
+- AstrBot `>=4.16,<5`（当前按 4.29 的 Provider / 插件页面接口编写）
+- `httpx`（AstrBot 自带）
+- ffmpeg 可选：mp3 / wav / m4a / amr / ogg / opus / webm / flac / aac / wma / mp4 / mov / mpg 会直接上传；只有 QQ/微信的 `silk` 等格式才需要转换。
+
+## 安装
+
+### 目录要求
+
+AstrBot 只扫描 `data/plugins/<插件目录>/main.py`。插件目录必须直接包含：
+
+```text
+data/plugins/astrbot_plugin_moss_voice/
+├─ main.py
+├─ metadata.yaml
+├─ _conf_schema.json
+├─ core/
+├─ providers/
+└─ pages/
 ```
-消息平台语音 ──► AstrBot STT (moss_stt_cloud)
-                    │  POST https://api.mosi.cn/v1/audio/transcriptions（multipart file）
-                    ▼
-                大模型回复文本
-                    │
-                    ▼
-              AstrBot TTS (moss_tts_cloud)
-                    │  POST https://api.mosi.cn/v1/audio/speech（JSON）
-                    ▼
-                语音消息回复
+
+不要出现 `.../moss-for-astrbot/moss-for-astrbot/main.py` 这种多套一层的情况。
+
+### 本地复制
+
+Windows PowerShell：
+
+```powershell
+$src = "C:\path\to\moss-for-astrbot"
+$dst = "C:\path\to\AstrBot\data\plugins\astrbot_plugin_moss_voice"
+New-Item -ItemType Directory -Force $dst | Out-Null
+Copy-Item "$src\*" $dst -Recurse -Force
 ```
 
-## 📦 已注册的 Provider
-
-| Provider 类型 | 名称 | 官方接口 | 模型 |
-|---|---|---|---|
-| `moss_tts_cloud` | MOSS 单人语音生成 | `POST /v1/audio/speech` | `moss-tts` |
-| `moss_stt_cloud` | MOSS 音频转写 | `POST /v1/audio/transcriptions` | `moss-transcribe` / `moss-transcribe-diarize` |
-
-## 🔑 官方接口契约摘要
-
-### 认证
-所有 `/v1` 接口使用 `Authorization: Bearer <API_KEY>`。API Key 在 [MossAPI 控制台](https://platform.mosi.cn)「API 密钥」页创建。接口**严格入参**：未知字段返回 `400 invalid_request_error`；无效 Key 常返回 `403 permission_error`。
-
-### 单人语音生成 `POST /v1/audio/speech`
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `model` | string | 是 | `moss-tts` |
-| `input` | string | 是 | 待合成文本；支持 `[pause X.Ys]`（0.1~10.0 秒） |
-| `voice_id` | string | 是 | 音色 ID，只接受音色 ID（不接受 URL / base64 / 参考音频） |
-| `version` | string | 否 | 模型变体，留空=默认（1.0 Pro）；1.5 Flash 为 `flash-20260626`（流式） |
-| `response_format` | string | 否 | `mp3` / `wav`（推荐 mp3） |
-| `delivery_method` | string | 否 | `audio`（默认，返回二进制）/ `url`（返回 JSON + 结果 URL） |
-| `async` / `webhook_url` / `aigc_metadata` | — | 否 | 异步任务与 AIGC 标识（本插件暂不启用） |
-
-### 音频转写 `POST /v1/audio/transcriptions`
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `model` | string | 是 | `moss-transcribe` / `moss-transcribe-diarize` |
-| `diarize` | boolean | 否 | 多说话人转写建议 `true`，返回结构化 segments |
-| `stream` | boolean | 否 | SSE 流式（本插件暂不启用） |
-| `response_format` | string | 否 | `json` / `text` |
-| `file` | file | 条件必填 | multipart 本地文件（最大 512 MB） |
-| `file_id` | string | 条件必填 | `POST /v1/files` 返回的文件 ID |
-| `url` / `audio_url` | string | 条件必填 | 公网音频 URL（不允许 localhost / 回环 / 私网） |
-
-> 输入源四选一且只传一个；**不支持 audio_data / Base64 / 内联音频**。插件统一把平台语音转成 WAV 后走 multipart `file` 上传（需要系统安装 [ffmpeg](https://ffmpeg.org/)）。
-
-### 音色
-
-- `GET /v1/audio/voices`：音色列表
-- `POST /v1/audio/voices`：克隆音色（multipart `audio_sample` + 可选 `name` / `description`）
-
-### 其他
-`POST /v1/files`（上传文件）、`GET /v1/models`（模型列表）、`GET /v1/audio/tasks/{task_id}`（异步任务查询）。
-
-## 🧠 模型与版本
-
-平台模型库的卡片名是「产品名」，API 里 `model` 是「接口/家族名」，变体由 `version` 选择：
-
-| 平台模型卡 | API `model` | `version` |
-|---|---|---|
-| MOSS-TTS-v1.0-Pro | `moss-tts` | 留空（服务端默认） |
-| MOSS-TTS-v1.5-Flash | `moss-tts` | `flash-20260626`（配合流式） |
-| MOSS-TTSD | `moss-ttsd` | —（另端点，未接入） |
-| MOSS-VoiceGenerator | `moss-voice-generator` | `moss-voice-generator-v1` |
-| MOSS-Transcribe | `moss-transcribe` | 留空 或 `moss-transcribe-v1` |
-| MOSS-Transcribe-Diarize-Pro | `moss-transcribe-diarize` | 留空 或 `v20260410-streamparam-20260703` |
-
-> **日常留空 `version` 即可**，即 MOSS-TTS-v1.0-Pro 稳定版。
-
-## 🚀 安装
-
-插件要求 **AstrBot ≥ 4.16**（建议最新版）。将本仓库放入插件目录：
+Linux / Docker 宿主机：
 
 ```bash
-cd <AstrBot 目录>/data/plugins
-git clone https://github.com/GasterMMT/moss-for-astrbot astrbot_plugin_moss_voice
+cp -r /path/to/moss-for-astrbot /path/to/AstrBot/data/plugins/astrbot_plugin_moss_voice
 ```
 
-或在 WebUI「插件市场 → 仓库安装」填写仓库地址。依赖仅 `httpx`（AstrBot 已内置）。
+Docker 部署时，把插件放进宿主机映射到容器 `/AstrBot/data/plugins/` 的目录，然后 `docker compose restart`（或重建容器）。
 
-## ⚙️ 使用步骤
+### 启动并配置
 
-1. **获取 API Key**：[MossAPI 平台](https://platform.mosi.cn) → 控制台 → 「API 密钥」→ 创建；
-2. **安装并重启 AstrBot**，打开插件管理 → **MOSS 语音（TTS/STT）** → 「settings」控制台页面；
-3. 在控制台页面：
-   - 填 API Key，选**音色 ID**（或「克隆音色」用本地参考音频生成自己的 voice_id）；
-   - 点「**保存并同步**」——会自动创建 `moss_tts_cloud` / `moss_stt_cloud` 服务提供商，并把 AstrBot 默认语音引擎切到 MOSS；
-   - 点「**测试 TTS**」听合成音、「**测试 STT**」验证转写回路；
-4. 完成后群友发语音 → MOSS 转写 → 大模型回复 → MOSS 合成语音。
+1. 重启 AstrBot，或在 WebUI 插件页重载插件。首次安装建议直接重启，确保 Provider 适配器在启动阶段注册。
+2. 打开插件详情页的 **MOSS 设置**。
+3. 填 API Key：
+   - Key 在 [platform.mosi.cn](https://platform.mosi.cn) 控制台创建。
+   - 也可以不填，改用环境变量 `MOSS_API_KEY`。
+4. 填音色 ID：
+   - 在 MOSS Create 克隆音色后复制 `voice_id`，粘贴到“音色 ID”。
+   - 也可以点“读取账号音色”，从当前账号列表里选。
+5. 保存。插件会自动创建/更新 `moss_tts` / `moss_stt`，并可按配置切换默认语音链路。
+6. 在「调试」区做一次 TTS 和 STT 测试。
 
-> **音色必填**：MOSS 官方 TTS 只接受 voice_id。可在控制台页面点选/克隆，或直接填官方内置音色。
+如果不想自动切换：关闭「切换为默认语音引擎」，或到 AstrBot「服务提供商」页手动选择 `MOSS 官方语音合成` / `MOSS 官方音频转写`。
 
-## 🎨 官方内置音色
+### 从旧版升级
 
-| 名称 | Voice ID |
-|---|---|
-| 轻快灵动女声（默认） | `806c9695-6160-404e-8722-4f788d935af3` |
-| 曼波有口音版 | `c6c0a40a-ea82-4468-9a21-333d3c4a76f6` |
-| 明太祖 | `f80b6698-0066-430b-88a0-f0fb8796db34` |
-| VOX AKUMA | `ddc6e38b-6f55-4415-b21b-a88cad2cc1d9` |
-| 李白 | `7662a8a1-700c-466a-b66b-57ece9e2e231` |
-| 旁白Jake | `f9a1416b-d006-4b77-9581-8f0e8ec1e401` |
-| 经验女教师 | `faf7f550-0627-4fc6-8db0-d3bfdad49358` |
-| 少年感人声（男） | `fe85a513-9bf3-4ef7-aa0b-8b2d11e4db93` |
-| 历史解说男声 | `0804710c-8e5e-4b67-acda-5785ef13c309` |
-| 优雅英国女士 | `9d1e88e9-3b9c-4992-a414-7a1cb3ff7ab5` |
-| 诗词朗读 | `2fdf194e-c16e-4587-9027-0d3464e09b4e` |
-| 故宫纪录片 | `133bd03b-d717-4a55-8974-7ffc9afc1b51` |
-| 东北虎哥 | `26838557-6890-4505-bc7c-e8198443a141` |
-| 忧伤的秋 | `19411508-8731-4b68-901d-7e4b8a98e23f` |
-| 三农农业旁白 | `944eb93b-3820-49f3-b2c0-4e37a31d1161` |
+1. 先停用/删除旧版插件目录，重启 AstrBot。
+2. 用新版覆盖到插件目录；**保持同一个目录名**时，旧 `cloud` / `stt` / `sync` 配置会自动迁移。
+3. 如果改了目录名，AstrBot 会读新的 `<目录名>_config.json`，旧 Key 不会自动跟过来：重新填一次，或把旧配置复制/改名为新文件名。
+4. 旧版留下的 `moss_tts_cloud` / `moss_stt_cloud` 服务提供商不会自动删除；到 AstrBot「服务提供商」页手动删掉即可。
 
-## 🚨 常见问题
+## 页面
 
-- **provider 列表里没有 MOSS？** 插件要求 AstrBot ≥ 4.16；MOSS 条目带 `provider_type`，会显示在「服务提供商」页的 TTS/STT 分组。仍看不到则重启 AstrBot。
-- **测试提示 403 permission_error？** API Key 缺失或无效；官方网关对无效 Key 常返回 403（不一定是 401）。
-- **TTS 提示缺少 voice_id？** 官方接口必填，请选择内置音色或克隆音色。
-- **AI 还在用别的（如 MiMo）语音？** 这是「配置组」优先级问题——该会话绑定的配置组默认值可能是别的提供商。插件同步会同时覆盖默认配置 + 所有配置组；也可用 `/provider tts <序号>` / `/provider stt <序号>` 手动切换。
-- **STT 无法识别？** 需系统安装 ffmpeg；音频 ≤512 MB。
-- **改音色没生效？** 改完点「保存并同步」，必要时重启 AstrBot 让实例重建。
+单页，不分标签：
 
-## 📄 许可
+- **01 API 连接**：API Key、API 地址、代理、超时、连接测试。
+- **02 语音合成 TTS**：模型、音色 ID（可读取账号音色）、语言、输出格式、单次字符上限。
+- **03 音频转写 STT**：模型、关键词、上传上限、说话人分离、说话人标注、时间码。
+- **04 AstrBot 路由**：`moss_tts` / `moss_stt` 状态、自动同步、默认语音引擎切换。
+- **05 调试**：一段 TTS 测试、一个音频 STT 测试。
 
-**MIT License** — 见 [LICENSE](LICENSE)。
+页面使用 AstrBot 的 `AstrBotPluginView` bridge。所有模型选择都是页面内自绘的下拉层，不使用原生 `<select>`，避免亮暗主题下白底浅字。
 
-插件代码 MIT 许可；API 与模型归 [MOSI](https://platform.mosi.cn) 所有，接口契约以官方文档为准。插件架构参考 AstrBot 内置 Provider 实现（`astrbot/core/provider/sources`）。
+## Provider
+
+| 类型 | 显示名 | 能力 | 默认模型 |
+|---|---|---|---|
+| `moss_tts` | MOSS 官方语音合成 | TTS | `moss-tts-1.5-flash` |
+| `moss_stt` | MOSS 官方音频转写 | STT | `moss-transcribe-1.0` |
+
+TTS 的 `get_audio(text)` 返回本地 mp3/wav 路径；STT 的 `get_text(audio_url)` 接受本地路径、`file://`、HTTP(S)、`base64://`、`data:` 音频。
+
+## 配置
+
+配置文件由 AstrBot 管理，位于 `data/config/`，文件名跟随插件目录（通常为 `<目录名>_config.json`）。
+
+```json
+{
+  "connection": {
+    "api_key": "",
+    "api_base": "https://api.mosi.cn",
+    "proxy": "",
+    "timeout": 120
+  },
+  "tts": {
+    "model": "moss-tts-1.5-flash",
+    "voice_id": "",
+    "language": "",
+    "response_format": "mp3",
+    "max_chars": 5000
+  },
+  "stt": {
+    "model": "moss-transcribe-1.0",
+    "diarize": true,
+    "keyterms": [],
+    "include_speaker": true,
+    "include_timestamp": false,
+    "max_upload_mb": 100
+  },
+  "routing": {
+    "auto_sync": true,
+    "auto_enable": true,
+    "tts_provider_id": "moss_tts",
+    "stt_provider_id": "moss_stt"
+  }
+}
+```
+
+`voice_id` 没有默认值，必须填自己账号下的音色 ID。
+
+## 模型
+
+| 模型 | 用途 | 注意 |
+|---|---|---|
+| `moss-tts-1.5-flash` | 快、便宜 | 支持 `language` 和 `[pause X.Ys]` |
+| `moss-tts-1.0-pro` | 更稳、质量优先 | 不支持 `language` / pause 语法 |
+| `moss-transcribe-1.0` | 普通转写 | 返回 `text` |
+| `moss-transcribe-diarize-pro` | 多说话人 | 返回 `segments`，支持 `diarize` / `keyterms` |
+
+快照版本（例如 `moss-tts-1.5-flash-2026-06-26`）也可以直接在配置里选，用于复现固定版本。
+
+## API 契约
+
+插件只使用下面这些官方接口：
+
+```text
+POST /v1/audio/speech
+  model, input, voice_id, language, response_format, delivery_method=audio
+  -> audio/* 二进制，或 {status, url, response_format, content_type}
+
+POST /v1/audio/transcriptions
+  multipart: model, file, response_format, diarize, keyterms
+  -> {text} 或 {text, segments[{speaker,start,end,text}]}
+
+GET  /v1/audio/voices
+  -> {data:[{id,name}], has_more, next_cursor}
+```
+
+第一版刻意不走 `stream` / `async` / webhook，先把同步链路做稳；页面和 Provider 都使用同步返回。
+
+## 测试
+
+```bash
+pip install pytest pytest-asyncio
+python -m pytest tests/test_core.py tests/test_providers.py
+```
+
+`tests/test_core.py` 覆盖 MOSS 客户端、错误解析、音频格式识别、配置迁移和转写格式化；`tests/test_providers.py` 用最小 AstrBot stub 验证 Provider 注册、页面路由、配置保存和启动期 Provider 同步。
+
+页面单独预览（不启动 AstrBot）：
+
+```bash
+python tests/ui_preview.py
+# http://127.0.0.1:8765/pages/settings/index.html
+```
+
+预览使用 `tests/mock_bridge.js` 模拟 `AstrBotPluginView` 和 MOSS 接口，不会请求真实 API。
+
+## 目录
+
+```text
+main.py                    插件入口 / 配置迁移 / 页面注册
+_conf_schema.json          插件配置页
+core/
+  client.py                MOSS HTTP 客户端
+  audio.py                 音频读取、格式识别、silk/ffmpeg 转换
+  config.py                默认值、校验、Provider 配置
+  formatting.py            转写 segments -> 文本
+  page_api.py              WebUI 后端路由
+  provider_sync.py         AstrBot Provider 写入 / 路由
+providers/
+  moss_tts.py              TTSProvider
+  moss_stt.py              STTProvider
+pages/settings/            单页 WebUI（index.html / style.css / app.js）
+tests/                     单元测试 + 页面预览 mock
+```
+
+## 安全与隐私
+
+- API Key 保存在 AstrBot 的插件配置文件中；页面通过已登录的 Dashboard bridge 读取，不写入日志。
+- 音频与文本只发送到 `api.mosi.cn`；不会经过第三方中转。
+- 合成结果、转写结果只在本机内存/临时目录中处理。
+- 代理配置可选；留空时直连。
+
+## 已知限制
+
+- TTS 暂时不支持流式播放；AstrBot 端会等完整音频生成后再发语音。
+- 页面里超过 8 MB 的转写测试文件走 `bridge.upload`，此时使用**已保存**的转写设置；小文件使用页面当前选项。
+- 音色 ID 为空时，TTS Provider 会明确报错，不会偷偷使用内置音色。
+- 插件卸载后，已写入的 `moss_tts` / `moss_stt` Provider 条目需要到 AstrBot「服务提供商」页面手动删除。
+- v3 是对旧版的重写：旧版 `moss-tts` / `moss-transcribe` / `version` 参数已不再使用，旧配置会在加载时自动迁移；旧版的服务提供商条目需要手动清理。
+
+## License
+
+MIT。见 [LICENSE](LICENSE)。

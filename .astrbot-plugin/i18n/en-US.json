@@ -1,0 +1,14 @@
+{
+  "views": {
+    "settings": {
+      "title": "MOSS Settings",
+      "description": "MOSS TTS / STT configuration and debug for AstrBot"
+    }
+  },
+  "pages": {
+    "settings": {
+      "title": "MOSS Settings",
+      "description": "MOSS TTS / STT configuration and debug for AstrBot"
+    }
+  }
+}

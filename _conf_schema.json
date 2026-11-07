@@ -1,140 +1,149 @@
 {
-  "cloud": {
+  "connection": {
     "type": "object",
-    "description": "官方 API（MossAPI · https://api.mosi.cn）",
-    "hint": "API Key 在 MossAPI 控制台「API 密钥」页创建。保存后在插件 settings 页面点击「同步到服务提供商」即可生效。",
+    "description": "MOSS 连接",
+    "hint": "API Key 在 platform.mosi.cn 控制台创建。也可以设置环境变量 MOSS_API_KEY。",
     "items": {
       "api_key": {
         "type": "string",
         "description": "API Key",
-        "hint": "MossAPI 控制台创建的密钥。留空则不同步/不测试。",
+        "hint": "留空时尝试读取环境变量 MOSS_API_KEY。",
         "default": ""
       },
       "api_base": {
         "type": "string",
         "description": "API 地址",
-        "hint": "官方地址为 https://api.mosi.cn，一般无需修改",
+        "hint": "官方地址为 https://api.mosi.cn，一般不用改。",
         "default": "https://api.mosi.cn"
       },
+      "proxy": {
+        "type": "string",
+        "description": "HTTP 代理",
+        "hint": "例如 http://127.0.0.1:7890，留空不使用。",
+        "default": ""
+      },
+      "timeout": {
+        "type": "int",
+        "description": "请求超时（秒）",
+        "default": 120
+      }
+    }
+  },
+  "tts": {
+    "type": "object",
+    "description": "语音合成",
+    "hint": "moss-tts-1.5-flash 更快，支持语言与 [pause 0.8s] 停顿；moss-tts-1.0-pro 更稳，不支持停顿语法。",
+    "items": {
       "model": {
         "type": "string",
-        "description": "单人语音生成模型",
-        "hint": "官方取值为 moss-tts",
+        "description": "TTS 模型",
         "options": [
-          "moss-tts"
+          "moss-tts-1.5-flash",
+          "moss-tts-1.0-pro",
+          "moss-tts-1.5-flash-2026-06-26",
+          "moss-tts-1.0-pro-2026-02-07"
         ],
-        "default": "moss-tts"
-      },
-      "version": {
-        "type": "string",
-        "description": "模型版本",
-        "hint": "可指定已上线并对外开放的模型版本；留空使用服务端当前默认版本。",
-        "default": ""
+        "default": "moss-tts-1.5-flash"
       },
       "voice_id": {
         "type": "string",
-        "description": "音色 ID（必填）",
-        "hint": "官方接口只接受音色 ID。可通过插件 settings 页面一键选择内置音色，或用参考音频克隆音色。默认：轻快灵动女声 806c9695-6160-404e-8722-4f788d935af3",
-        "default": "806c9695-6160-404e-8722-4f788d935af3"
+        "description": "音色 ID",
+        "hint": "在 MOSS Create 克隆音色后复制 voice_id 粘贴到这里；插件不会内置示例音色。",
+        "default": ""
+      },
+      "language": {
+        "type": "string",
+        "description": "发音语言",
+        "hint": "仅 moss-tts-1.5-flash 支持，填英文全称，如 Chinese / English；留空自动判断。",
+        "default": ""
       },
       "response_format": {
         "type": "string",
         "description": "输出格式",
-        "hint": "官方推荐 mp3",
         "options": [
           "mp3",
           "wav"
         ],
         "default": "mp3"
       },
-      "delivery_method": {
-        "type": "string",
-        "description": "交付方式",
-        "hint": "audio：直接返回音频二进制；url：返回 JSON 与结果 URL",
-        "options": [
-          "audio",
-          "url"
-        ],
-        "default": "audio"
-      },
-      "timeout": {
+      "max_chars": {
         "type": "int",
-        "description": "请求超时（秒）",
-        "default": 120
-      },
-      "proxy": {
-        "type": "string",
-        "description": "HTTP 代理",
-        "hint": "如 http://127.0.0.1:7890，留空不使用",
-        "default": ""
+        "description": "单次合成字数上限",
+        "default": 5000
       }
     }
   },
   "stt": {
     "type": "object",
-    "description": "音频转写（/v1/audio/transcriptions）",
-    "hint": "普通转写用 moss-transcribe；多说话人转写用 moss-transcribe-diarize。插件会自动把平台语音转成 WAV 后以 multipart file 上传（需要系统安装 ffmpeg）。",
+    "description": "音频转写",
+    "hint": "普通转写用 moss-transcribe-1.0；需要说话人分离时用 moss-transcribe-diarize-pro。",
     "items": {
       "model": {
         "type": "string",
-        "description": "转写模型",
+        "description": "STT 模型",
         "options": [
-          "moss-transcribe",
-          "moss-transcribe-diarize"
+          "moss-transcribe-1.0",
+          "moss-transcribe-diarize-pro",
+          "moss-transcribe-1.0-2026-07-22",
+          "moss-transcribe-diarize-pro-2026-07-03"
         ],
-        "default": "moss-transcribe-diarize"
-      },
-      "version": {
-        "type": "string",
-        "description": "模型版本",
-        "hint": "留空使用服务端默认版本（多说话人转写可选 v20260410-streamparam-20260703）。",
-        "default": ""
+        "default": "moss-transcribe-1.0"
       },
       "diarize": {
         "type": "bool",
         "description": "说话人分离",
-        "hint": "多说话人转写时建议开启，返回结构化 segments（说话人 + 起止时间）。",
+        "hint": "仅在 diarize-pro 模型上生效。",
         "default": true
       },
-      "response_format": {
-        "type": "string",
-        "description": "响应格式",
-        "options": [
-          "json",
-          "text"
-        ],
-        "default": "json"
+      "keyterms": {
+        "type": "list",
+        "description": "关键词",
+        "hint": "帮助识别专有名词，仅 diarize-pro 支持，例如 MOSS、SGLang。",
+        "default": []
       },
       "include_speaker": {
         "type": "bool",
-        "description": "结果带说话人标注",
-        "hint": "开启后多人语音结果形如「S01: ...」（插件侧格式化）",
+        "description": "结果带说话人",
+        "hint": "在聊天与页面结果中显示 S01:。",
         "default": true
       },
       "include_timestamp": {
         "type": "bool",
         "description": "结果带时间戳",
-        "hint": "开启后每段结果前加 [ss.s-ss.s]（插件侧格式化）",
+        "hint": "每段前加 [00:01.2–00:03.4]。",
         "default": false
+      },
+      "max_upload_mb": {
+        "type": "int",
+        "description": "音频大小上限（MB）",
+        "default": 100
       }
     }
   },
-  "sync": {
+  "routing": {
     "type": "object",
-    "description": "同步与开关",
-    "hint": "控制插件与 AstrBot 服务提供商的联动。",
+    "description": "接入 AstrBot",
+    "hint": "保存配置后自动创建 moss_tts / moss_stt 两个服务提供商；开启自动启用会把 AstrBot 的语音合成 / 识别切到 MOSS。",
     "items": {
       "auto_sync": {
         "type": "bool",
-        "description": "启动时自动同步",
-        "hint": "AstrBot 启动/插件重载时，自动按上面的配置创建或更新 MOSS 官方 TTS / STT 服务提供商（需要已填写 API Key）。",
+        "description": "保存后自动同步 Provider",
         "default": true
       },
       "auto_enable": {
         "type": "bool",
-        "description": "同步后自动启用",
-        "hint": "同步后将 AstrBot 的默认「语音合成 / 语音识别」切换为 MOSS 官方服务并开启。",
+        "description": "同步后切换为默认语音引擎",
         "default": true
+      },
+      "tts_provider_id": {
+        "type": "string",
+        "description": "TTS Provider ID",
+        "default": "moss_tts"
+      },
+      "stt_provider_id": {
+        "type": "string",
+        "description": "STT Provider ID",
+        "default": "moss_stt"
       }
     }
   }
